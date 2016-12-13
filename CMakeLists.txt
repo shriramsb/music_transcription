@@ -5,5 +5,7 @@ find_package( OpenCV 3.1 REQUIRED )
 include_directories( include ${OpenCV_INCLUDE_DIRS} )
 
 add_executable(keyboard_edge src/keyboard_edge.cpp)
+add_executable(perspective_transform src/perspective_transform.cpp)
 
 target_link_libraries(keyboard_edge ${OpenCV_LIBS})
+traget_link_libraries(perspective_transform ${OpenCV_LIBS})
