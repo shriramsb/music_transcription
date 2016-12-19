@@ -9,7 +9,7 @@
 using namespace std;
 using namespace cv;
 
-void modify_detected(vector<vector<Point> > &contours, vector<Rect> &boundRect, vector<Moments> &mu, vector<Point2f> &mc, int n_white_keys) {
+void modify_detected(vector<vector<Point> > &contours, vector<Rect> &boundRect, vector<Moments> &mu, vector<Point2f> &mc, int n_white_keys, Mat &bg) {
 	
 	// getting median in y coordinate of edges detected and average deviation from median
 	vector<int> u_y, l_y, dist;
@@ -20,7 +20,7 @@ void modify_detected(vector<vector<Point> > &contours, vector<Rect> &boundRect, 
 	cout << "dist_push_back" << endl;
 	for (int i = 0, n = contours.size(); i < n - 1; i++) {
 		// width/2 need not be added according to the angle
-		dist.push_back(boundRect[i + 1].x + boundRect[i + 1].width/2 - boundRect[i].x - boundRect[i].width/2);
+		dist.push_back(mc[i + 1].x - mc[i].x);
 	}
 	sort(u_y.begin(), u_y.end());
 	sort(l_y.begin(), l_y.end());
@@ -53,22 +53,35 @@ void modify_detected(vector<vector<Point> > &contours, vector<Rect> &boundRect, 
 			contours[i].push_back(Point(x, u_y_median));
 			contours[i].push_back(Point(x, l_y_median));
 			boundRect[i] = boundingRect(Mat(contours[i]));
+			cout << i << endl;
+			mu[i] = moments(contours[i], false);
+			mc[i] = Point2f(x, (u_y_median + l_y_median)/2);
 		}
 	}
+	Mat center_white_edges = bg.clone();
+	for (int i = 0, n = mc.size(); i < n; i++) {
+		circle(center_white_edges, mc[i], 3, Scalar(0,0,255));
+		cout << mc[i] << endl;
+		imshow("center_white_edges", center_white_edges);
+		waitKey(0);
+	}
+	imshow("center_white_edges", center_white_edges);
+	cout << "mc.size() " << mc.size() << endl;
+	waitKey(0);
 
 	// adding undetected edges of white keys
 	int i = 0;
 	cout << "n_white_keys" << n_white_keys << endl;
 	while (i < n_white_keys) {
 
-		if (abs(boundRect[i + 1].x + boundRect[i + 1].width/2 - boundRect[i].x - boundRect[i].width/2) > 3.0*dist_median/2) {
-			cout << i << ' ' << dist[i] << endl;
-			waitKey(0);
+		if (abs(mc[i + 1].x - mc[i].x) > 3.0*dist_median/2) {
 			vector<Point> temp;
-			temp.push_back(Point(boundRect[i].x + dist_median, u_y_median));
-			temp.push_back(Point(boundRect[i].x + dist_median, l_y_median));
+			temp.push_back(Point(mc[i].x + dist_median, u_y_median));
+			temp.push_back(Point(mc[i].x + dist_median, l_y_median));
 			contours.insert(contours.begin() + i + 1, temp);
 			boundRect.insert(boundRect.begin() + i + 1, boundingRect(Mat(temp)));
+			mu.insert(mu.begin() + i + 1, moments(temp, false));
+			mc.insert(mc.begin() + i + 1, Point2f(mc[i].x + dist_median, (u_y_median + l_y_median)/2));
 		}
 		i++;
 	}
@@ -253,10 +266,15 @@ void get_white_keys(Mat &bg, vector<vector<Point> > &black_keys, vector<Rect> &b
 		mu[i] = moments(contours[i], false);
 		mc[i] = Point2f(mu[i].m10/mu[i].m00, mu[i].m01/mu[i].m00);
 	}
-
+	// Mat center_white_edges = bg.clone();
+	// for (int i = 0, n = mc.size(); i < n; i++) {
+	// 	circle(center_white_edges, mc[i], 3, Scalar(0,0,255));
+	// }
+	// imshow("center_white_edges", center_white_edges);
+	// waitKey(0);
 
 	// checking if white key edges are properly detected and correcting if necessary
-	modify_detected(contours, boundRect, mu, mc, black_keys.size() + gap_pos.size());
+	modify_detected(contours, boundRect, mu, mc, black_keys.size() + gap_pos.size(), bg);
 
 	Mat after_modify_detect = bg.clone();
 	for (int i = 0, n = contours.size(); i < n; i++) {
@@ -283,21 +301,21 @@ void get_white_keys(Mat &bg, vector<vector<Point> > &black_keys, vector<Rect> &b
 	
 	for (int i = 0, n = white_keys.size(); i < n; i++) {
 		if(gap_left) {
-			white_keys[i].push_back(Point(boundRect[i].x + boundRect[i].width/2, boundRect[i].y));
-			white_keys[i].push_back(Point(boundRect[i].x + boundRect[i].width/2, boundRect[i].y + boundRect[i].height));
+			white_keys[i].push_back(Point(mc[i].x, boundRect[i].y));
+			white_keys[i].push_back(Point(mc[i].x, boundRect[i].y + boundRect[i].height));
 			int j = 0;
-			while (j < black_keys_poly[k - 1].size() && black_keys_poly[k - 1][j].x > boundRect[i].x)
+			while (j < black_keys_poly[k - 1].size() && black_keys_poly[k - 1][j].x > mc[i].x)
 				j++;
 			cout << (contourArea(black_keys_poly[k - 1], true) > 0) << endl;
 			if (contourArea(black_keys_poly[k - 1],true) > 0)
 				for (int p = 0, m = black_keys_poly[k - 1].size(); p < m; p++) {
-					if (black_keys_poly[k - 1][(p + j)%m].x > boundRect[i].x)
+					if (black_keys_poly[k - 1][(p + j)%m].x > mc[i].x)
 						white_keys[i].push_back(black_keys_poly[k - 1][(p+j)%m]);
 				}
 			else {
 				stack<Point> t;
 				for (int p = 0, m = black_keys_poly[k - 1].size(); p < m; p++) {
-					if (black_keys_poly[k - 1][(p+j)%m].x > boundRect[i].x)
+					if (black_keys_poly[k - 1][(p+j)%m].x > mc[i].x)
 						t.push(black_keys_poly[k - 1][(p+j)%m]);
 				}
 				while (!t.empty()) {
@@ -306,28 +324,28 @@ void get_white_keys(Mat &bg, vector<vector<Point> > &black_keys, vector<Rect> &b
 				}
 			}
 
-			white_keys[i].push_back(Point(boundRect[i + 1].x + boundRect[i + 1].width/2, s.height));
-			white_keys[i].push_back(Point(boundRect[i + 1].x + boundRect[i + 1].width/2, boundRect[i + 1].y));
+			white_keys[i].push_back(Point(mc[i + 1].x, s.height));
+			white_keys[i].push_back(Point(mc[i + 1].x, boundRect[i + 1].y));
 			gap_left = false;
 			gap_right = true;
 		}
 		else if (gap_right) {
-			white_keys[i].push_back(Point(boundRect[i].x + boundRect[i].width/2, boundRect[i].y));
-			white_keys[i].push_back(Point(boundRect[i].x + boundRect[i].width/2, s.height));
+			white_keys[i].push_back(Point(mc[i].x, boundRect[i].y));
+			white_keys[i].push_back(Point(mc[i].x, s.height));
 			int j = 0;
 			cout << "ok" << endl;
-			while (j < black_keys_poly[k].size() && black_keys_poly[k][j].x < boundRect[i + 1].x)
+			while (j < black_keys_poly[k].size() && black_keys_poly[k][j].x < mc[i + 1].x)
 				j++;
 			cout << (contourArea(black_keys_poly[k], true) > 0) << endl;
 			if (contourArea(black_keys_poly[k],true) > 0)
 				for (int p = 0, m = black_keys_poly[k].size(); p < m; p++) {
-					if (black_keys_poly[k][(p+j)%m].x < boundRect[i + 1].x)
+					if (black_keys_poly[k][(p+j)%m].x < mc[i + 1].x)
 						white_keys[i].push_back(black_keys_poly[k][(p+j)%m]);
 				}
 			else {
 				stack<Point> t;
 				for (int p = 0, m = black_keys_poly[k].size(); p < m; p++) {
-					if (black_keys_poly[k][(p+j)%m].x < boundRect[i + 1].x)
+					if (black_keys_poly[k][(p+j)%m].x < mc[i + 1].x)
 						t.push(black_keys_poly[k][(p+j)%m]);
 				}
 				while (!t.empty()) {
@@ -335,21 +353,21 @@ void get_white_keys(Mat &bg, vector<vector<Point> > &black_keys, vector<Rect> &b
 					t.pop();
 				}
 			}
-			white_keys[i].push_back(Point(boundRect[i + 1].x + boundRect[i + 1].width/2, boundRect[i + 1].y + boundRect[i + 1].height));
-			white_keys[i].push_back(Point(boundRect[i + 1].x + boundRect[i + 1].width/2, boundRect[i + 1].y));
+			white_keys[i].push_back(Point(mc[i + 1].x, boundRect[i + 1].y + boundRect[i + 1].height));
+			white_keys[i].push_back(Point(mc[i + 1].x, boundRect[i + 1].y));
 			gap_right = false;
 			k++;
 		}
 		else {
-			white_keys[i].push_back(Point(boundRect[i].x + boundRect[i].width/2, boundRect[i].y));
-			white_keys[i].push_back(Point(boundRect[i].x + boundRect[i].width/2, boundRect[i].y + boundRect[i].height));
+			white_keys[i].push_back(Point(mc[i].x, boundRect[i].y));
+			white_keys[i].push_back(Point(mc[i].x, boundRect[i].y + boundRect[i].height));
 			int j = 0;
-			while (j < black_keys_poly[k - 1].size() && black_keys_poly[k - 1][j].x > boundRect[i].x)
+			while (j < black_keys_poly[k - 1].size() && black_keys_poly[k - 1][j].x >  mc[i].x)
 				j++;
 			cout << (contourArea(black_keys_poly[k - 1], true) > 0) << endl;
 			if (contourArea(black_keys_poly[k - 1],true) > 0)
 				for (int p = 0, m = black_keys_poly[k - 1].size(); p < m; p++) {
-					if (black_keys_poly[k - 1][(p + j)%m].x > boundRect[i].x)
+					if (black_keys_poly[k - 1][(p + j)%m].x > mc[i].x)
 						white_keys[i].push_back(black_keys_poly[k - 1][(p+j)%m]);
 					else
 						break;
@@ -357,7 +375,7 @@ void get_white_keys(Mat &bg, vector<vector<Point> > &black_keys, vector<Rect> &b
 			else {
 				stack<Point> t;
 				for (int p = 0, m = black_keys_poly[k - 1].size(); p < m; p++) {
-					if (black_keys_poly[k - 1][(p+j)%m].x > boundRect[i].x)
+					if (black_keys_poly[k - 1][(p+j)%m].x > mc[i].x)
 						t.push(black_keys_poly[k - 1][(p+j)%m]);
 				}
 				while (!t.empty()) {
@@ -366,18 +384,18 @@ void get_white_keys(Mat &bg, vector<vector<Point> > &black_keys, vector<Rect> &b
 				}
 			}
 			j = 0;
-			while (j < black_keys_poly[k].size() && black_keys_poly[k][j].x < boundRect[i + 1].x)
+			while (j < black_keys_poly[k].size() && black_keys_poly[k][j].x < mc[i + 1].x)
 				j++;
 			cout << (contourArea(black_keys_poly[k], true) > 0) << endl;
 			if (contourArea(black_keys_poly[k],true) > 0)
 				for (int p = 0, m = black_keys_poly[k].size(); p < m; p++) {
-					if (black_keys_poly[k][(p+j)%m].x < boundRect[i + 1].x)
+					if (black_keys_poly[k][(p+j)%m].x < mc[i + 1].x)
 						white_keys[i].push_back(black_keys_poly[k][(p+j)%m]);
 				}
 			else {
 				stack<Point> t;
 				for (int p = 0, m = black_keys_poly[k].size(); p < m; p++) {
-					if (black_keys_poly[k][(p+j)%m].x < boundRect[i + 1].x)
+					if (black_keys_poly[k][(p+j)%m].x < mc[i + 1].x)
 						t.push(black_keys_poly[k][(p+j)%m]);
 				}
 				while (!t.empty()) {
@@ -385,8 +403,8 @@ void get_white_keys(Mat &bg, vector<vector<Point> > &black_keys, vector<Rect> &b
 					t.pop();
 				}
 			}
-			white_keys[i].push_back(Point(boundRect[i + 1].x + boundRect[i + 1].width/2, boundRect[i + 1].y + boundRect[i + 1].height));
-			white_keys[i].push_back(Point(boundRect[i + 1].x + boundRect[i + 1].width/2, boundRect[i + 1].y));
+			white_keys[i].push_back(Point(mc[i + 1].x, boundRect[i + 1].y + boundRect[i + 1].height));
+			white_keys[i].push_back(Point(mc[i + 1].x, boundRect[i + 1].y));
 			k++;
 			if (!gap_pos.empty() && (k - 1) == gap_pos.front()) {
 				gap_left = true;
