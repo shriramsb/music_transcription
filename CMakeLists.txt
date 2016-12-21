@@ -6,3 +6,9 @@ include_directories(include ${OpenCV_INCLUDE_DIRS})
 
 add_executable(build/frame_picker src/frame_picker.cpp)
 target_link_libraries(build/frame_picker ${OpenCV_LIBS})
+
+add_executable(build/keyboard_edge src/keyboard_edge.cpp)
+target_link_libraries(build/keyboard_edge ${OpenCV_LIBS})
+
+add_executable(build/perspective_transform src/perspective_transform.cpp)
+target_link_libraries(build/perspective_transform ${OpenCV_LIBS})
