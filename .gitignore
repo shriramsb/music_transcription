@@ -1,0 +1,17 @@
+# ignore CMakeFiles
+CMakeFiles/**
+
+# ignore CMakeCache.txt
+CMakeCache.txt
+
+# ignore cmake_install.cmake
+cmake_install.cmake
+
+# ignore Makefile
+Makefile
+
+# ignore build/
+build/**
+
+
+
