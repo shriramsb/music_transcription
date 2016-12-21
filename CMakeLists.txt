@@ -12,3 +12,6 @@ target_link_libraries(build/keyboard_edge ${OpenCV_LIBS})
 
 add_executable(build/perspective_transform src/perspective_transform.cpp)
 target_link_libraries(build/perspective_transform ${OpenCV_LIBS})
+
+add_executable(build/key_detection src/key_detection.cpp src/filehandle_vov.cpp src/my_contours_utility.cpp)
+target_link_libraries(build/key_detection ${OpenCV_LIBS})

@@ -23,6 +23,8 @@ void draw_contours_show(Mat &img, vvP &contours, bool separate) {
 }
 
 void get_bddRect(vvP &contours, vvP &contours_poly, vector<Rect> &boundRect) {
+	contours_poly = vvP(contours.size());
+	boundRect = vector<Rect>(contours.size());
 	for (int i = 0, n = contours.size(); i < n; i++) {
 		approxPolyDP(contours[i], contours_poly[i], 3, true);
 		boundRect[i] = boundingRect(Mat(contours_poly[i]));
