@@ -15,3 +15,6 @@ target_link_libraries(build/perspective_transform ${OpenCV_LIBS})
 
 add_executable(build/key_detection src/key_detection.cpp src/filehandle_vov.cpp src/my_contours_utility.cpp)
 target_link_libraries(build/key_detection ${OpenCV_LIBS})
+
+add_executable(build/key_press_detector src/key_press_detector.cpp src/filehandle_vov.cpp src/my_contours_utility.cpp)
+target_link_libraries(build/key_press_detector ${OpenCV_LIBS})

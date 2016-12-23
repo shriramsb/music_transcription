@@ -13,5 +13,8 @@ Makefile
 # ignore build/
 build/**
 
+#ignore test data
+test*/
+
 
 
