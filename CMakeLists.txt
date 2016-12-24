@@ -18,3 +18,6 @@ target_link_libraries(build/key_detection ${OpenCV_LIBS})
 
 add_executable(build/key_press_detector src/key_press_detector.cpp src/filehandle_vov.cpp src/my_contours_utility.cpp)
 target_link_libraries(build/key_press_detector ${OpenCV_LIBS})
+
+add_executable(build/find_pressed_keys src/find_pressed_keys.cpp src/KeyPressDetector.cpp src/filehandle_vov.cpp src/my_contours_utility.cpp)
+target_link_libraries(build/find_pressed_keys ${OpenCV_LIBS})
