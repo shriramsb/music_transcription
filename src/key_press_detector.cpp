@@ -86,6 +86,20 @@ void print(vector<int> &v) {
 	cout << '\n';
 }
 
+void segment_diff(vector<Mat> &keys_mat, Mat &diff, vector<int> &keys, vector<Mat> &key_and_diff) {
+	for (int p = 0, q = keys.size(), i = 0; p < q; p++) {
+		Mat temp;
+		bitwise_and(keys_mat[keys[i]], diff, temp);
+		if (countNonZero(temp) == 0) {
+			keys.erase(keys.begin() + i);
+		}
+		else {
+			key_and_diff.push_back(temp);
+			i++;
+		}
+	}
+}
+
 int main(int argc, char** argv) {
 	VideoCapture cap(argv[1]);
 	Mat bg;			// background image
@@ -169,6 +183,7 @@ int main(int argc, char** argv) {
 
 
 		vector<int> pressed_keys;
+		vector<int> black_pressed_keys;
 
 		// bounding box for hand - step 1
 		Mat hand_cont_img = fg_trans.clone();
@@ -191,28 +206,35 @@ int main(int argc, char** argv) {
 		}
 		imshow("hand_cont_img", hand_cont_img);
 		keys_near_hand(white_keys, hand_boundRect, pressed_keys);
+		for (int i = 0, n = black_keys_boundRect.size(); i < n; i++) {
+			for (int j = 0, m = hand_boundRect.size(); j < m; j++) {
+				bool necessary_cond = black_keys_boundRect[i].y <= hand_boundRect[j].y + hand_boundRect[j].height;
+				if (necessary_cond) {
+					bool case1 = black_keys_boundRect[i].x >= hand_boundRect[j].x && black_keys_boundRect[i].x <= hand_boundRect[j].x + hand_boundRect[j].width;
+					bool case2 = black_keys_boundRect[i].x + black_keys_boundRect[i].width >= hand_boundRect[j].x && black_keys_boundRect[i].x + black_keys_boundRect[i].width <= hand_boundRect[j].x + hand_boundRect[j].width;
+					bool case3 = hand_boundRect[j].x >= black_keys_boundRect[i].x && hand_boundRect[j].x + hand_boundRect[j].width <= black_keys_boundRect[i].x + black_keys_boundRect[i].width;
+					if (case1 || case2 || case3) {
+						black_pressed_keys.push_back(i);
+						break;
+					}
+				}
+			}
+		}
+		cout << "near hand ";
+		print(black_pressed_keys);
 
-		cout << "inside bdd_rect" << ' ';
-		print(pressed_keys);
 
 		// key and contours
 		vector<Mat> key_and_contour;
-		for (int p = 0, q = pressed_keys.size(), i = 0; p < q; p++) {
-			Mat temp;
-			bitwise_and(white_keys_mat[pressed_keys[i]], neg_diff_w_hand, temp);
-			if (countNonZero(temp) == 0) {
-				pressed_keys.erase(pressed_keys.begin() + i);
-			}
-			else {
-				key_and_contour.push_back(temp);
-				i++;
-			}
-		}
-
-		cout << "Non zero" << ' ';
-		print(pressed_keys);
+		vector<Mat> black_key_and_contour;
+		segment_diff(white_keys_mat, neg_diff_w_hand, pressed_keys, key_and_contour);
+		segment_diff(black_keys_mat, pos_diff_w_hand, black_pressed_keys, black_key_and_contour);
+		
+		cout << "Non zero ";		
+		print(black_pressed_keys);
 
 		vector<int> final_pressed_keys;
+		vector<int> final_black_pressed_keys;
 
 		for (int p = 0, q = pressed_keys.size(); p < q; p++) {
 			int curr_key = pressed_keys[p];
@@ -236,10 +258,46 @@ int main(int argc, char** argv) {
 				final_pressed_keys.push_back(curr_key);
 			}
 		}
+
+		for (int p = 0, q = black_pressed_keys.size(); p < q; p++) {
+			int curr_key = black_pressed_keys[p];
+			int key_width = black_keys_boundRect[curr_key].width;
+			vector<vector<Point> > contours_pressed_key;
+			vector<Vec4i> hie;
+			findContours(black_key_and_contour[p], contours_pressed_key, hie, RETR_TREE, CHAIN_APPROX_SIMPLE, Point(0,0));
+			vector<vector<Point> > contours_pressed_key_poly;
+			vector<Rect> contours_pressed_key_boundRect;
+			get_bddRect(contours_pressed_key, contours_pressed_key_poly, contours_pressed_key_boundRect);
+			for (int i = 0; i < contours_pressed_key.size(); ) {
+				if (contours_pressed_key_boundRect[i].height > black_keys_boundRect[curr_key].height/3) { //&& contours_pressed_key_boundRect[i].width > key_width/10) {
+					break;
+				}
+				else {
+					contours_pressed_key.erase(contours_pressed_key.begin() + i);
+					contours_pressed_key_boundRect.erase(contours_pressed_key_boundRect.begin() + i);
+				}
+			}
+			if (contours_pressed_key.size() > 0) {
+				final_black_pressed_keys.push_back(curr_key);
+			}
+		}
+
+		cout << "final_pressed_keys ";
+		print(final_pressed_keys);
+
 		Mat pressed_keys_show = fg_trans.clone();
 		for (int i = 0; i < final_pressed_keys.size(); i++) {
-			line(pressed_keys_show, white_keys[final_pressed_keys[i]][0], white_keys[final_pressed_keys[i]][1], Scalar(0, 0, 255));
-			line(pressed_keys_show, white_keys[final_pressed_keys[i]][white_keys[final_pressed_keys[i]].size() - 2], white_keys[final_pressed_keys[i]][white_keys[final_pressed_keys[i]].size() - 1], Scalar(0, 0, 255));
+			int curr_key = final_pressed_keys[i];
+			Point w1 = white_keys[curr_key][0];
+			Point w2 = white_keys[curr_key][white_keys[curr_key].size() - 2];
+			w2.y = s.height/3;
+			rectangle(pressed_keys_show, w1, w2, Scalar(0, 0, 255));	
+		}
+		for (int i = 0; i < final_black_pressed_keys.size(); i++) {
+			int curr_key = final_black_pressed_keys[i];
+			Point b1 = Point(black_keys_boundRect[curr_key].x, black_keys_boundRect[curr_key].y);
+			Point b2 = Point(black_keys_boundRect[curr_key].x + black_keys_boundRect[curr_key].width, black_keys_boundRect[curr_key].y + black_keys_boundRect[curr_key].height);
+			rectangle(pressed_keys_show, b1, b2, Scalar(0, 0, 255));	
 		}
 		imshow("pressed_keys_show", pressed_keys_show);
 
