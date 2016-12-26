@@ -1,21 +1,17 @@
-/*
-Give input image as command line argument
-Press '0' and click anywhere to select the first corner
-and then press '1' and click on the image and so on
-and after selecting all four corners, press 'f' to finish and save corners to file "keyboard_edge.xml"
-*/
+/* 	1. Give the image of keyboard and destination xml file to store the corners of keyboard as input
+	2. Press i to select the i-th corner of keyboard starting from 0
+	3. Make sure that 0-1 and 3-4 edges are perpendicular to keyboard keys
+		and 0-1 edge is near the white key end(lower end of keyboard)
+*/ 
 
-#include <iostream>
-#include <fstream>
 #include "opencv2/highgui/highgui.hpp"
-#include "opencv2/core/core.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 
 using namespace std;
 using namespace cv;
 
 struct KeyboardCorners {
-	vector<Point2d> corners;
+	vector<Point2f> corners;
 	int no;
 };
 
@@ -41,10 +37,9 @@ void MouseCallBack(int event, int x, int y, int flags, void* userdata) {
 }
 
 int main(int argc, char** argv) {
-
 	KeyboardCorners k;
 	k.no = 0;
-	k.corners = vector<Point2d>(4, Point2d(0, 0));
+	k.corners = vector<Point2f>(4, Point2f(0, 0));
 	img = imread(argv[1], 1);
 	namedWindow("KeyboardEdges", WINDOW_NORMAL);
 	imshow("KeyboardEdges", img);
@@ -52,22 +47,15 @@ int main(int argc, char** argv) {
 	char ch = 'i';
 
 	while (ch != 'f') {
-		if (ch == 'h') {
-			cout << "r - reset\nf - finish"; 
-		}
-		else if (ch == 'r') {
+		if (ch == 'r') {
 			k.no = 0;
 		}
 		ch = waitKey(0);
 		if (ch == '0' || ch == '1' || ch == '2' || ch == '3')
 			k.no = (int)(ch - 48);
 	}
-	FileStorage f("keyboard_edge.xml", FileStorage::WRITE);
-
-	f << "corner0" << k.corners[0];
-	f << "corner1" << k.corners[1];
-	f << "corner2" << k.corners[2];
-	f << "corner3" << k.corners[3];
+	FileStorage f(argv[2], FileStorage::WRITE);
+	f << "keyboard_corners" << k.corners;
 	f.release();
 	
 }
